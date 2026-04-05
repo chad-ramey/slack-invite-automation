@@ -1,0 +1,12 @@
+# Slack CLI local state
+.slack/apps.dev.json
+.slack/cache/
+
+# Claude Code local state
+.claude/
+
+# macOS
+.DS_Store
+
+# Deno
+deno.lock

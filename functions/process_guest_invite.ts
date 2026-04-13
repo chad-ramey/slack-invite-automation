@@ -265,18 +265,19 @@ async function handleNewMessage(
       `[LIVE] Auto-approving invite ${invite.inviteRequestId} for ${invite.email}`,
     );
     try {
+      const formBody = new URLSearchParams();
+      formBody.append("invite_request_id", invite.inviteRequestId);
+      formBody.append("team_id", "T056MAJRM63");
+
       const approveResponse = await fetch(
         "https://slack.com/api/admin.inviteRequests.approve",
         {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${adminToken}`,
-            "Content-Type": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
           },
-          body: JSON.stringify({
-            invite_request_id: invite.inviteRequestId,
-            team_id: "T056MAJRM63",
-          }),
+          body: formBody.toString(),
         },
       );
       const approveResult = await approveResponse.json();

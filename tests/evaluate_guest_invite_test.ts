@@ -14,6 +14,7 @@ function makeInvite(
     timeLimit: "2026-05-25T23:59:59.000Z",
     timeLimitEpoch: 1779839999,
     reason: "valid reason",
+    inviteRequestId: null,
     ...overrides,
   };
 }

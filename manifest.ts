@@ -6,7 +6,7 @@ import { ProcessedInvitesDatastore } from "./datastores/processed_invites.ts";
 export default Manifest({
   name: "EA Slack Invite Automation",
   description:
-    "Shadow mode observer for guest invite requests — evaluates rules and creates Jira audit tickets",
+    "Auto-approves qualifying guest invites, creates Jira audit tickets, flags others for review",
   icon: "assets/ea_slack_connect_auto.png",
   workflows: [PollGuestInvitesWorkflow, GuestInviteShadowWorkflow],
   datastores: [ProcessedInvitesDatastore],

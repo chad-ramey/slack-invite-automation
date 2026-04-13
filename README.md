@@ -24,35 +24,38 @@ flagged but not actioned.
 10. If the bot decision disagrees with the human decision, an alert is posted to
     #ea-slack-admin
 
-The bot is **read-only** — it never approves, denies, or takes action on any
-invite request.
+The bot **auto-approves** qualifying guest invites via `admin.inviteRequests.approve`
+(using a user OAuth token). Full Member and manual review invites are flagged but
+not actioned. The polling backup path is shadow-only (never approves).
 
 ## Architecture
 
 Two parallel processing paths share the same datastore for dedup:
 
 ```
-PRIMARY — Event-Driven (instant):
+PRIMARY — Event-Driven (instant, auto-approves):
   Event: message_posted in #slack-invites-approval
     └─► guest_invite_shadow_workflow
           └─► ProcessGuestInvite (process_guest_invite.ts)
                 ├── Detect invite pattern in event text
                 ├── Fetch full message via conversations.history
-                ├── Parse Slackbot attachment (parse_guest_invite.ts)
+                ├── Parse Slackbot attachment + extract invite_request_id
                 ├── Check domain skip list
                 ├── Evaluate rules (evaluate_guest_invite.ts)
+                ├── AUTO_APPROVE + pending → admin.inviteRequests.approve
                 ├── Create Jira ticket (jira_utils.ts)
-                ├── Reply to thread with ticket info
-                ├── On approval/denial: update ticket with comparison
+                ├── Reply to thread (Auto-Approved / Flagged / Manual Review)
+                ├── On human action: update ticket with comparison
                 └── On mismatch: post alert → #ea-slack-admin
 
-BACKUP — Polling (hourly):
+BACKUP — Polling (hourly, shadow-only):
   Scheduled trigger (every 1 hour)
     └─► poll_guest_invites_workflow
           └─► PollGuestInvites (poll_guest_invites.ts)
                 ├── Fetch last 48 hours via conversations.history
                 ├── Check datastore for dedup (shared with event path)
-                └── Same processing pipeline as above
+                ├── Never calls approve/deny APIs
+                └── Creates tickets and tracks decisions only
 ```
 
 ## Rule Engine
@@ -69,6 +72,7 @@ Invites from these domains are skipped entirely — no ticket, no action:
 
 - `tripleten.com` — TripleTen merge accounts
 - `nebius.com` — Internal Nebius users
+- `internal.yourcompany.com` — Former Nebius employees
 - `tavily.com` — Partner domain
 
 ## Project Structure
@@ -228,5 +232,13 @@ When a Jira ticket is created, the bot replies to the invite message thread:
 - AUTO_DENY and MANUAL_REVIEW are observation-only — flagged for human review
 - Polling path is shadow-only — never calls approve/deny APIs
 - Kill switch: `SHADOW_MODE_GUEST_INVITES=false` stops all processing
+- Remove `SLACK_ADMIN_USER_TOKEN` env var → reverts to shadow mode for approvals
 - This app is **not** the EA Slack Connect Automation (A0AL7E8F00Z) — that is a
   separate production app
+
+## Documentation
+
+- **Confluence Design Doc:** [Design Doc: EA Slack Invite Automation](https://your-org.atlassian.net/wiki/spaces/NEBEA/pages/1619624072)
+- **Slack Governance Operations:** [Slack Governance Operations](https://your-org.atlassian.net/wiki/spaces/PROJ/pages/1656259533)
+- **Canvas:** #slack-invites-approval channel canvas (source of truth for day-to-day ops)
+- **Related:** [Design Doc: EA Slack Connect Automation](https://your-org.atlassian.net/wiki/spaces/NEBEA/pages/1499561996)

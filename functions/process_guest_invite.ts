@@ -121,6 +121,8 @@ export default SlackFunction(
 
             if (historyResult.ok && historyResult.messages?.length > 0) {
               message = historyResult.messages[0] as SlackMessage;
+              // Preserve channel_id from the event — conversations.history doesn't include it
+              message.channel_id = channelId;
               console.log(
                 `[SHADOW] Got full message, attachments: ${
                   Array.isArray(message.attachments)
@@ -262,39 +264,79 @@ async function handleNewMessage(
     adminToken
   ) {
     console.log(
-      `[LIVE] Auto-approving invite ${invite.inviteRequestId} for ${invite.email}`,
+      `[LIVE] Auto-approving invite for ${invite.email}`,
     );
     try {
-      const formBody = new URLSearchParams();
-      formBody.append("invite_request_id", invite.inviteRequestId);
-      formBody.append("team_id", "T056MAJRM63");
-
-      const approveResponse = await fetch(
-        "https://slack.com/api/admin.inviteRequests.approve",
+      // Step 1: Look up the Ir... invite request ID via admin.inviteRequests.list
+      // (The numeric ID from the Slackbot button is NOT the same as the API ID)
+      const listResponse = await fetch(
+        "https://slack.com/api/admin.inviteRequests.list",
         {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${adminToken}`,
             "Content-Type": "application/x-www-form-urlencoded",
           },
-          body: formBody.toString(),
+          body: new URLSearchParams({ team_id: "T056MAJRM63" }).toString(),
         },
       );
-      const approveResult = await approveResponse.json();
-      if (approveResult.ok) {
-        autoApproved = true;
-        console.log(
-          `[LIVE] Successfully approved invite for ${invite.email}`,
+      const listResult = await listResponse.json();
+
+      let apiInviteId: string | null = null;
+      if (listResult.ok && Array.isArray(listResult.invite_requests)) {
+        const match = listResult.invite_requests.find(
+          // deno-lint-ignore no-explicit-any
+          (req: any) =>
+            req.email?.toLowerCase() === invite.email.toLowerCase(),
         );
+        if (match) {
+          apiInviteId = match.id;
+          console.log(
+            `[LIVE] Found API invite ID: ${apiInviteId} for ${invite.email}`,
+          );
+        } else {
+          console.warn(
+            `[LIVE] No pending invite found in API for ${invite.email} — may already be approved`,
+          );
+        }
       } else {
         console.error(
-          `[LIVE] Failed to approve invite: ${approveResult.error}`,
+          `[LIVE] Failed to list invite requests: ${listResult.error}`,
         );
-        await postAlert(
-          client,
-          alertChannelId,
-          `:warning: Failed to auto-approve guest invite for ${invite.email}: ${approveResult.error}`,
+      }
+
+      // Step 2: Approve using the Ir... ID
+      if (apiInviteId) {
+        const approveResponse = await fetch(
+          "https://slack.com/api/admin.inviteRequests.approve",
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${adminToken}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              invite_request_id: apiInviteId,
+              team_id: "T056MAJRM63",
+            }).toString(),
+          },
         );
+        const approveResult = await approveResponse.json();
+        if (approveResult.ok) {
+          autoApproved = true;
+          console.log(
+            `[LIVE] Successfully approved invite for ${invite.email} (${apiInviteId})`,
+          );
+        } else {
+          console.error(
+            `[LIVE] Failed to approve invite: ${approveResult.error} | Full response: ${JSON.stringify(approveResult)}`,
+          );
+          await postAlert(
+            client,
+            alertChannelId,
+            `:warning: Failed to auto-approve guest invite for ${invite.email}: ${approveResult.error}`,
+          );
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

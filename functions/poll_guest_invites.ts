@@ -29,7 +29,12 @@ const DEFAULT_ALERT_CHANNEL = "C0AN2HL1AG4"; // #ea-slack-admin
 const LOOKBACK_HOURS = 48;
 
 // Internal/partner domains to skip entirely — no ticket, no action
-const SKIP_DOMAINS = ["tripleten.com", "nebius.com", "tavily.com"];
+const SKIP_DOMAINS = [
+  "tripleten.com",
+  "nebius.com",
+  "internal.yourcompany.com",
+  "tavily.com",
+];
 
 export const PollGuestInvites = DefineFunction({
   callback_id: "poll_guest_invites",
@@ -452,14 +457,19 @@ async function postThreadReply(
   evaluation: RuleEvaluation,
 ): Promise<void> {
   const jiraUrl = `https://your-org.atlassian.net/browse/${issueKey}`;
-  const decisionEmoji = evaluation.decision === "AUTO_APPROVE"
-    ? ":white_check_mark:"
-    : evaluation.decision === "AUTO_DENY"
-    ? ":no_entry_sign:"
-    : ":eyes:";
 
-  const text =
-    `${decisionEmoji} *Shadow Mode* | <${jiraUrl}|${issueKey}> | Bot decision: *${evaluation.decision}*`;
+  // Polling path is always shadow-only (never approves)
+  let text: string;
+  if (evaluation.decision === "AUTO_DENY") {
+    text =
+      `:no_entry_sign: *Flagged* | <${jiraUrl}|${issueKey}> | Full Member — requires manual review`;
+  } else if (evaluation.decision === "MANUAL_REVIEW") {
+    text =
+      `:eyes: *Manual Review* | <${jiraUrl}|${issueKey}> | Missing criteria — needs admin review`;
+  } else {
+    text =
+      `:white_check_mark: *Shadow* | <${jiraUrl}|${issueKey}> | Bot decision: *${evaluation.decision}*`;
+  }
 
   try {
     const result = await client.apiCall("chat.postMessage", {

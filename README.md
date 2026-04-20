@@ -1,10 +1,11 @@
 # EA Slack Invite Automation
 
-A Slack-hosted Deno app that observes guest invite requests in
-**#slack-invites-approval** and evaluates them against approval rules. Currently
-running in **shadow mode (Phase 0)** — the bot creates Jira audit tickets,
-replies to threads with ticket info, and compares its decisions against human
-approvers, but takes no action on invites.
+A Slack-hosted Deno app that monitors guest invite requests in
+**#slack-invites-approval** and evaluates them against approval rules.
+**Phase 1 (live)** — the bot auto-approves qualifying guest invites (Single/Multi-Channel
+Guest + private channel + time limit + reason), creates Jira audit tickets, and
+replies to threads. Full Member, manual review, and internal domain invites are
+flagged but not actioned.
 
 ## How It Works
 
@@ -23,35 +24,38 @@ approvers, but takes no action on invites.
 10. If the bot decision disagrees with the human decision, an alert is posted to
     #ea-slack-admin
 
-The bot is **read-only** — it never approves, denies, or takes action on any
-invite request.
+The bot **auto-approves** qualifying guest invites via `admin.inviteRequests.approve`
+(using a user OAuth token). Full Member and manual review invites are flagged but
+not actioned. The polling backup path is shadow-only (never approves).
 
 ## Architecture
 
 Two parallel processing paths share the same datastore for dedup:
 
 ```
-PRIMARY — Event-Driven (instant):
+PRIMARY — Event-Driven (instant, auto-approves):
   Event: message_posted in #slack-invites-approval
     └─► guest_invite_shadow_workflow
           └─► ProcessGuestInvite (process_guest_invite.ts)
                 ├── Detect invite pattern in event text
                 ├── Fetch full message via conversations.history
-                ├── Parse Slackbot attachment (parse_guest_invite.ts)
+                ├── Parse Slackbot attachment + extract invite_request_id
                 ├── Check domain skip list
                 ├── Evaluate rules (evaluate_guest_invite.ts)
+                ├── AUTO_APPROVE + pending → admin.inviteRequests.approve
                 ├── Create Jira ticket (jira_utils.ts)
-                ├── Reply to thread with ticket info
-                ├── On approval/denial: update ticket with comparison
+                ├── Reply to thread (Auto-Approved / Flagged / Manual Review)
+                ├── On human action: update ticket with comparison
                 └── On mismatch: post alert → #ea-slack-admin
 
-BACKUP — Polling (hourly):
+BACKUP — Polling (hourly, shadow-only):
   Scheduled trigger (every 1 hour)
     └─► poll_guest_invites_workflow
           └─► PollGuestInvites (poll_guest_invites.ts)
                 ├── Fetch last 48 hours via conversations.history
                 ├── Check datastore for dedup (shared with event path)
-                └── Same processing pipeline as above
+                ├── Never calls approve/deny APIs
+                └── Creates tickets and tracks decisions only
 ```
 
 ## Rule Engine
@@ -68,6 +72,7 @@ Invites from these domains are skipped entirely — no ticket, no action:
 
 - `tripleten.com` — TripleTen merge accounts
 - `nebius.com` — Internal Nebius users
+- `internal.yourcompany.com` — Former Nebius employees
 - `tavily.com` — Partner domain
 
 ## Project Structure
@@ -80,8 +85,8 @@ functions/
   parse_guest_invite.ts                      # Parses Slackbot attachment-based messages
   evaluate_guest_invite.ts                   # Rule evaluation engine
   jira_utils.ts                              # Jira JSM ticket creation/update
-  process_guest_invite.ts                    # Event-driven shadow mode handler
-  poll_guest_invites.ts                      # Polling shadow mode handler
+  process_guest_invite.ts                    # Event-driven handler (auto-approves + shadow)
+  poll_guest_invites.ts                      # Polling handler (shadow-only, never approves)
 workflows/
   guest_invite_shadow_workflow.ts            # Event-driven workflow
   poll_guest_invites_workflow.ts             # Polling workflow
@@ -89,7 +94,7 @@ triggers/
   guest_invite_message_trigger.ts            # message_posted event trigger
   poll_guest_invites_trigger.ts              # Hourly scheduled trigger
 tests/
-  parse_guest_invite_test.ts                 # 18 parser tests
+  parse_guest_invite_test.ts                 # 21 parser tests
   evaluate_guest_invite_test.ts              # 11 rule engine tests
 ```
 
@@ -118,7 +123,8 @@ Set via `slack env add`:
 | --------------------------- | ------------------------------------------------------------------------------------ |
 | `JIRA_USER_EMAIL`           | Jira service account email (your-service-account@yourcompany.com)                            |
 | `JIRA_API_TOKEN`            | Jira API token for the above account                                                 |
-| `SHADOW_MODE_GUEST_INVITES` | Defaults to enabled; set to `"false"` to disable (optional)                          |
+| `SLACK_ADMIN_USER_TOKEN`    | xoxp- user OAuth token for admin.inviteRequests.approve (from EA Invite Approval Token app) |
+| `SHADOW_MODE_GUEST_INVITES` | Defaults to enabled; set to `"false"` to disable all processing (optional)           |
 | `ALERT_CHANNEL_ID`          | Override default alert channel (optional, defaults to #ea-slack-admin `C0AN2HL1AG4`) |
 | `INVITE_CHANNEL_ID`         | Override default invite channel (optional, defaults to `C05LQKN5F29`)                |
 
@@ -155,9 +161,10 @@ Jira failures are fully isolated — they are logged but never block observation
 
 ## Service Accounts
 
-| Account                        | Purpose                                    |
-| ------------------------------ | ------------------------------------------ |
-| `your-service-account@yourcompany.com` | Jira API auth, ticket reporter + assignee  |
+| Account                        | Purpose                                                      |
+| ------------------------------ | ------------------------------------------------------------ |
+| `your-service-account@yourcompany.com` | Jira API auth, ticket reporter + assignee                    |
+| EA Invite Approval Token (OAuth app) | Provides xoxp- user token with `admin.invites:write` scope |
 
 ## Deployment
 
@@ -203,25 +210,35 @@ Mismatch alerts (bot decision differs from human decision) are posted to
 
 ## Thread Replies
 
-When a Jira ticket is created, the bot replies to the invite message thread with:
-- Ticket link (clickable)
-- Bot decision (AUTO_APPROVE / AUTO_DENY / MANUAL_REVIEW)
-- Decision emoji indicator
+When a Jira ticket is created, the bot replies to the invite message thread:
+- Auto-approved: `:white_check_mark: Auto-Approved | PROJ-XXXX | Approved by EA Slack Invite Automation`
+- Full Member: `:no_entry_sign: Flagged | PROJ-XXXX | Full Member — requires manual review`
+- Manual review: `:eyes: Manual Review | PROJ-XXXX | Missing criteria — needs admin review`
+- Shadow (polling): `:white_check_mark: Shadow | PROJ-XXXX | Bot decision: AUTO_APPROVE`
 
 ## Phase Roadmap
 
-| Phase | Status    | Description                                              |
-| ----- | --------- | -------------------------------------------------------- |
-| 0     | **Live**  | Shadow mode — observe, log, create tickets, compare      |
-| 1     | Planned   | Auto-approve qualifying guest invites                    |
-| 2     | Planned   | Auto-deny Full Member requests                           |
-| 3     | Future    | Guest expiration management                              |
+| Phase | Status       | Description                                              |
+| ----- | ------------ | -------------------------------------------------------- |
+| 0     | Complete     | Shadow mode — observe, log, create tickets, compare      |
+| 1     | **Live**     | Auto-approve qualifying guest invites (event-driven only)|
+| 2     | Planned      | Auto-deny Full Member requests                           |
+| 3     | Future       | Guest expiration management                              |
 
-## DO NOT
+## Safety
 
-- This app does **not** call `admin.inviteRequests.approve` or
-  `admin.inviteRequests.deny`
-- This app does **not** take any action on invite requests
-- This app does **not** modify existing Slack Connect workflows
+- This app **auto-approves only** when ALL criteria are met (Guest + private +
+  time limit + reason + external domain). It never denies.
+- AUTO_DENY and MANUAL_REVIEW are observation-only — flagged for human review
+- Polling path is shadow-only — never calls approve/deny APIs
+- Kill switch: `SHADOW_MODE_GUEST_INVITES=false` stops all processing
+- Remove `SLACK_ADMIN_USER_TOKEN` env var → reverts to shadow mode for approvals
 - This app is **not** the EA Slack Connect Automation (A0AL7E8F00Z) — that is a
   separate production app
+
+## Documentation
+
+- **Confluence Design Doc:** [Design Doc: EA Slack Invite Automation](https://your-org.atlassian.net/wiki/spaces/NEBEA/pages/1619624072)
+- **Slack Governance Operations:** [Slack Governance Operations](https://your-org.atlassian.net/wiki/spaces/PROJ/pages/1656259533)
+- **Canvas:** #slack-invites-approval channel canvas (source of truth for day-to-day ops)
+- **Related:** [Design Doc: EA Slack Connect Automation](https://your-org.atlassian.net/wiki/spaces/NEBEA/pages/1499561996)

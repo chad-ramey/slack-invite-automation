@@ -349,3 +349,106 @@ Deno.test("parseDecisionText: non-decision text", () => {
   assertEquals(parseDecisionText("just a regular message"), null);
   assertEquals(parseDecisionText(""), null);
 });
+
+// === inviteRequestId extraction tests ===
+
+Deno.test("parseInviteMessage: extracts inviteRequestId from pending invite with actions", () => {
+  const message: SlackMessage = {
+    text: "<@U0A9LLN7CN9> requested to invite one person to Nebius.",
+    attachments: [
+      { id: 1, text: "*Email*: <mailto:test@example.com|test@example.com>" },
+      {
+        id: 2,
+        text:
+          "*Account type*: <https://slack.com/help/articles/360018112273|Full Member>",
+      },
+      { id: 3, text: "*Channel:* :lock: private-channel" },
+      {
+        id: 4,
+        fallback: "Approve/Deny the invite request on team site",
+        callback_id: "inviterequests_T056MAJRM63",
+        actions: [
+          {
+            id: "1",
+            name: "approve",
+            text: "Send Invitation",
+            type: "button",
+            value: "10451351706352",
+            style: "primary",
+          },
+          {
+            id: "2",
+            name: "deny",
+            text: "Deny",
+            type: "button",
+            value: "10451351706352",
+            style: "danger",
+          },
+        ],
+      },
+    ],
+  };
+
+  const result = parseInviteMessage(message);
+  assertEquals(result !== null, true);
+  assertEquals(result!.inviteRequestId, "10451351706352");
+  assertEquals(result!.email, "test@example.com");
+  assertEquals(result!.accountType, "Full Member");
+});
+
+Deno.test("parseInviteMessage: inviteRequestId is null for already-decided invite", () => {
+  const message: SlackMessage = {
+    text: "<@U05RFQEE5LY> requested to invite one person to Nebius.",
+    attachments: [
+      {
+        id: 1,
+        text: "*Email*: <mailto:test@gmail.com|test@gmail.com>",
+      },
+      {
+        id: 2,
+        text:
+          "*Account type*: <https://slack.com/help/articles/360018112273|Single-Channel Guest>",
+      },
+      { id: 3, text: "*Channel:* :lock: private-channel" },
+      {
+        id: 4,
+        text:
+          "*Time limit*: This account will be deactivated on <!date^1777499999^{date} at {time}|June 1st 2020>.",
+      },
+      { id: 5, text: "*Reason for Request*:\nCSA Hiring" },
+      {
+        text:
+          ":white_check_mark: <@U083F1R4Z5J> approved this request. Invitation sent.",
+      },
+    ],
+  };
+
+  const result = parseInviteMessage(message);
+  assertEquals(result !== null, true);
+  assertEquals(result!.inviteRequestId, null);
+  assertEquals(result!.email, "test@gmail.com");
+});
+
+Deno.test("parseInviteMessage: inviteRequestId is null when no actions attachment", () => {
+  const message: SlackMessage = {
+    text: "<@U05B5NLQM6W> requested to invite one person to Nebius.",
+    attachments: [
+      {
+        id: 1,
+        text:
+          "*Email*: <mailto:meeting@gmail.com|meeting@gmail.com>",
+      },
+      {
+        id: 2,
+        text:
+          "*Account type*: <https://slack.com/help/articles/360018112273|Single-Channel Guest>",
+      },
+      { id: 3, text: "*Channel:* :lock: private-channel" },
+      { id: 4, text: "*Reason for Request*:\ninterview" },
+    ],
+  };
+
+  const result = parseInviteMessage(message);
+  assertEquals(result !== null, true);
+  assertEquals(result!.inviteRequestId, null);
+});

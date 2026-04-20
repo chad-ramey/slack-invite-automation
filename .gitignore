@@ -1,5 +1,6 @@
 # Slack CLI local state
 .slack/apps.dev.json
+.slack/apps.json
 .slack/cache/
 
 # Claude Code local state

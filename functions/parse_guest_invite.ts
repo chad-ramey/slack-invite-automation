@@ -34,6 +34,7 @@ export interface ParsedGuestInvite {
   timeLimit: string | null;
   timeLimitEpoch: number | null;
   reason: string | null;
+  inviteRequestId: string | null;
 }
 
 export interface ParsedDecision {
@@ -78,8 +79,17 @@ export function parseInviteMessage(
   let timeLimit: string | null = null;
   let timeLimitEpoch: number | null = null;
   let reason: string | null = null;
+  let inviteRequestId: string | null = null;
 
   for (const att of attachments) {
+    // Invite request ID: found in action buttons (callback_id starts with "inviterequests_")
+    if (
+      att.callback_id && String(att.callback_id).startsWith("inviterequests_") &&
+      Array.isArray(att.actions) && att.actions.length > 0
+    ) {
+      inviteRequestId = String(att.actions[0].value || "");
+      continue;
+    }
     const attText = att.text || att.fallback || "";
 
     // Email: *Email*: <mailto:x@y.com|x@y.com>
@@ -183,6 +193,7 @@ export function parseInviteMessage(
     timeLimit,
     timeLimitEpoch,
     reason,
+    inviteRequestId: inviteRequestId || null,
   };
 }
 

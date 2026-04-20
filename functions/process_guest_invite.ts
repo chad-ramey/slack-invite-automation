@@ -33,7 +33,12 @@ import { ProcessedInvitesDatastore } from "../datastores/processed_invites.ts";
 const DEFAULT_ALERT_CHANNEL = "C0AN2HL1AG4";
 
 // Internal/partner domains to skip entirely — no ticket, no action
-const SKIP_DOMAINS = ["tripleten.com", "nebius.com", "tavily.com"];
+const SKIP_DOMAINS = [
+  "tripleten.com",
+  "nebius.com",
+  "internal.yourcompany.com",
+  "tavily.com",
+];
 
 export const ProcessGuestInvite = DefineFunction({
   callback_id: "process_guest_invite",
@@ -116,6 +121,8 @@ export default SlackFunction(
 
             if (historyResult.ok && historyResult.messages?.length > 0) {
               message = historyResult.messages[0] as SlackMessage;
+              // Preserve channel_id from the event — conversations.history doesn't include it
+              message.channel_id = channelId;
               console.log(
                 `[SHADOW] Got full message, attachments: ${
                   Array.isArray(message.attachments)
@@ -138,6 +145,7 @@ export default SlackFunction(
           client,
           jiraEnv,
           alertChannelId,
+          env.SLACK_ADMIN_USER_TOKEN || "",
         );
       } else {
         console.log(`[SHADOW] Ignoring message subtype: ${subtype}`);
@@ -160,6 +168,7 @@ async function handleNewMessage(
   client: any,
   jiraEnv: JiraEnv,
   alertChannelId: string,
+  adminToken: string,
 ): Promise<{ outputs: { status: string; error: string } }> {
   const messageTs = String(message.ts || "");
 
@@ -248,6 +257,105 @@ async function handleNewMessage(
   // Check if there's already a decision in the attachments
   const existingDecision = parseDecisionFromMessage(message);
 
+  // Auto-approve if all criteria met and invite is still pending
+  let autoApproved = false;
+  if (
+    evaluation.decision === "AUTO_APPROVE" && invite.inviteRequestId &&
+    adminToken
+  ) {
+    console.log(
+      `[LIVE] Auto-approving invite for ${invite.email}`,
+    );
+    try {
+      // Step 1: Look up the Ir... invite request ID via admin.inviteRequests.list
+      // (The numeric ID from the Slackbot button is NOT the same as the API ID)
+      const listResponse = await fetch(
+        "https://slack.com/api/admin.inviteRequests.list",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${adminToken}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({ team_id: "T056MAJRM63" }).toString(),
+        },
+      );
+      const listResult = await listResponse.json();
+
+      let apiInviteId: string | null = null;
+      if (listResult.ok && Array.isArray(listResult.invite_requests)) {
+        const match = listResult.invite_requests.find(
+          // deno-lint-ignore no-explicit-any
+          (req: any) =>
+            req.email?.toLowerCase() === invite.email.toLowerCase(),
+        );
+        if (match) {
+          apiInviteId = match.id;
+          console.log(
+            `[LIVE] Found API invite ID: ${apiInviteId} for ${invite.email}`,
+          );
+        } else {
+          console.warn(
+            `[LIVE] No pending invite found in API for ${invite.email} — may already be approved`,
+          );
+        }
+      } else {
+        console.error(
+          `[LIVE] Failed to list invite requests: ${listResult.error}`,
+        );
+      }
+
+      // Step 2: Approve using the Ir... ID
+      if (apiInviteId) {
+        const approveResponse = await fetch(
+          "https://slack.com/api/admin.inviteRequests.approve",
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${adminToken}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              invite_request_id: apiInviteId,
+              team_id: "T056MAJRM63",
+            }).toString(),
+          },
+        );
+        const approveResult = await approveResponse.json();
+        if (approveResult.ok) {
+          autoApproved = true;
+          console.log(
+            `[LIVE] Successfully approved invite for ${invite.email} (${apiInviteId})`,
+          );
+        } else {
+          console.error(
+            `[LIVE] Failed to approve invite: ${approveResult.error} | Full response: ${JSON.stringify(approveResult)}`,
+          );
+          await postAlert(
+            client,
+            alertChannelId,
+            `:warning: Failed to auto-approve guest invite for ${invite.email}: ${approveResult.error}`,
+          );
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[LIVE] Exception approving invite: ${msg}`);
+      await postAlert(
+        client,
+        alertChannelId,
+        `:warning: Exception auto-approving guest invite for ${invite.email}: ${msg}`,
+      );
+    }
+  } else if (
+    evaluation.decision === "AUTO_APPROVE" && invite.inviteRequestId &&
+    !adminToken
+  ) {
+    console.warn(
+      `[LIVE] SLACK_ADMIN_USER_TOKEN not set — cannot auto-approve ${invite.email}`,
+    );
+  }
+
   // Create Jira ticket
   const issueKey = await createGuestInviteTicket(ticketData, jiraEnv);
   if (issueKey) {
@@ -258,7 +366,14 @@ async function handleNewMessage(
     // Reply to the invite message thread with ticket info
     const channelId = String(message.channel || message.channel_id || "");
     if (channelId && messageTs) {
-      await postThreadReply(client, channelId, messageTs, issueKey, evaluation);
+      await postThreadReply(
+        client,
+        channelId,
+        messageTs,
+        issueKey,
+        evaluation,
+        autoApproved,
+      );
     }
   } else {
     console.warn(`[SHADOW] Failed to create Jira ticket for ${invite.email}`);
@@ -376,6 +491,7 @@ async function handleMessageChanged(
           client,
           jiraEnv,
           alertChannelId,
+          "", // No admin token for message_changed path — shadow only
         );
       }
     }
@@ -733,15 +849,24 @@ async function postThreadReply(
   threadTs: string,
   issueKey: string,
   evaluation: RuleEvaluation,
+  autoApproved = false,
 ): Promise<void> {
   const jiraUrl = `https://your-org.atlassian.net/browse/${issueKey}`;
-  const decisionEmoji = evaluation.decision === "AUTO_APPROVE"
-    ? ":white_check_mark:"
-    : evaluation.decision === "AUTO_DENY"
-    ? ":no_entry_sign:"
-    : ":eyes:";
 
-  const text = `${decisionEmoji} *Shadow Mode* | <${jiraUrl}|${issueKey}> | Bot decision: *${evaluation.decision}*`;
+  let text: string;
+  if (autoApproved) {
+    text =
+      `:white_check_mark: *Auto-Approved* | <${jiraUrl}|${issueKey}> | Approved by EA Slack Invite Automation`;
+  } else if (evaluation.decision === "AUTO_DENY") {
+    text =
+      `:no_entry_sign: *Flagged* | <${jiraUrl}|${issueKey}> | Full Member — requires manual review`;
+  } else if (evaluation.decision === "MANUAL_REVIEW") {
+    text =
+      `:eyes: *Manual Review* | <${jiraUrl}|${issueKey}> | Missing criteria — needs admin review`;
+  } else {
+    text =
+      `:white_check_mark: *Shadow* | <${jiraUrl}|${issueKey}> | Bot decision: *${evaluation.decision}*`;
+  }
 
   try {
     const result = await client.apiCall("chat.postMessage", {

@@ -2,11 +2,11 @@ import { TriggerTypes } from "deno-slack-api/mod.ts";
 import { PollGuestInvitesWorkflow } from "../workflows/poll_guest_invites_workflow.ts";
 
 /**
- * Scheduled trigger that runs every 15 minutes to poll
- * #slack-invites-approval for new guest invite requests.
+ * Scheduled trigger that runs hourly to poll
+ * the invite approval channel for new guest invite requests.
  *
- * This replaces the message_posted event trigger, which does not
- * fire in the Nebius Enterprise Grid org.
+ * Acts as a backup to the event trigger for any missed messages.
+ * This path is shadow-only — it never calls approve/deny APIs.
  */
 // deno-lint-ignore no-explicit-any
 const PollGuestInvitesTrigger: Record<string, any> = {

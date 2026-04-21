@@ -23,18 +23,14 @@ import {
   updateGuestInviteTicket,
 } from "./jira_utils.ts";
 import { ProcessedInvitesDatastore } from "../datastores/processed_invites.ts";
+import {
+  ALERT_CHANNEL_ID as DEFAULT_ALERT_CHANNEL,
+  INVITE_CHANNEL_ID as DEFAULT_INVITE_CHANNEL,
+  JIRA_BASE_URL,
+  SKIP_DOMAINS,
+} from "../config.ts";
 
-const DEFAULT_INVITE_CHANNEL = "C05LQKN5F29"; // #slack-invites-approval
-const DEFAULT_ALERT_CHANNEL = "C0AN2HL1AG4"; // #ea-slack-admin
 const LOOKBACK_HOURS = 48;
-
-// Internal/partner domains to skip entirely — no ticket, no action
-const SKIP_DOMAINS = [
-  "tripleten.com",
-  "nebius.com",
-  "internal.yourcompany.com",
-  "tavily.com",
-];
 
 export const PollGuestInvites = DefineFunction({
   callback_id: "poll_guest_invites",
@@ -456,7 +452,7 @@ async function postThreadReply(
   issueKey: string,
   evaluation: RuleEvaluation,
 ): Promise<void> {
-  const jiraUrl = `https://your-org.atlassian.net/browse/${issueKey}`;
+  const jiraUrl = `${JIRA_BASE_URL}/browse/${issueKey}`;
 
   // Polling path is always shadow-only (never approves)
   let text: string;

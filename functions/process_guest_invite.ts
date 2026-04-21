@@ -28,17 +28,12 @@ import {
   updateGuestInviteTicket,
 } from "./jira_utils.ts";
 import { ProcessedInvitesDatastore } from "../datastores/processed_invites.ts";
-
-// Default alert channel: #ea-slack-admin. Override via ALERT_CHANNEL_ID env var.
-const DEFAULT_ALERT_CHANNEL = "C0AN2HL1AG4";
-
-// Internal/partner domains to skip entirely — no ticket, no action
-const SKIP_DOMAINS = [
-  "tripleten.com",
-  "nebius.com",
-  "internal.yourcompany.com",
-  "tavily.com",
-];
+import {
+  ALERT_CHANNEL_ID as DEFAULT_ALERT_CHANNEL,
+  JIRA_BASE_URL,
+  SKIP_DOMAINS,
+  TEAM_ID,
+} from "../config.ts";
 
 export const ProcessGuestInvite = DefineFunction({
   callback_id: "process_guest_invite",
@@ -277,7 +272,7 @@ async function handleNewMessage(
             "Authorization": `Bearer ${adminToken}`,
             "Content-Type": "application/x-www-form-urlencoded",
           },
-          body: new URLSearchParams({ team_id: "T056MAJRM63" }).toString(),
+          body: new URLSearchParams({ team_id: TEAM_ID }).toString(),
         },
       );
       const listResult = await listResponse.json();
@@ -317,7 +312,7 @@ async function handleNewMessage(
             },
             body: new URLSearchParams({
               invite_request_id: apiInviteId,
-              team_id: "T056MAJRM63",
+              team_id: TEAM_ID,
             }).toString(),
           },
         );
@@ -851,7 +846,7 @@ async function postThreadReply(
   evaluation: RuleEvaluation,
   autoApproved = false,
 ): Promise<void> {
-  const jiraUrl = `https://your-org.atlassian.net/browse/${issueKey}`;
+  const jiraUrl = `${JIRA_BASE_URL}/browse/${issueKey}`;
 
   let text: string;
   if (autoApproved) {

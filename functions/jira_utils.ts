@@ -1,16 +1,17 @@
 /**
  * Jira integration utilities for Slack Guest Invite Shadow Mode
  *
- * Creates audit tickets in PROJ project via JSM API for each observed
- * guest invite request. Follows the same pattern as the Slack Connect automation.
- * Jira failures are logged but NEVER crash the workflow.
+ * Creates audit tickets in your Jira project via JSM API for each observed
+ * guest invite request. Jira failures are logged but NEVER crash the workflow.
  */
 
-const JIRA_BASE_URL = "https://your-org.atlassian.net";
-const SERVICE_DESK_ID = "YOUR_SERVICE_DESK_ID";
-const REQUEST_TYPE_ID = "YOUR_REQUEST_TYPE_ID";
-const DONE_TRANSITION_ID = "YOUR_DONE_TRANSITION_ID"; // "Done" transition for PROJ project
-const SVC_ACCOUNT_ID = "YOUR_JIRA_SERVICE_ACCOUNT_ID"; // your-service-account@yourcompany.com
+import {
+  JIRA_BASE_URL,
+  JIRA_DONE_TRANSITION_ID as DONE_TRANSITION_ID,
+  JIRA_REQUEST_TYPE_ID as REQUEST_TYPE_ID,
+  JIRA_SERVICE_DESK_ID as SERVICE_DESK_ID,
+  JIRA_SVC_ACCOUNT_ID as SVC_ACCOUNT_ID,
+} from "../config.ts";
 
 export interface JiraEnv {
   jiraEmail: string;
@@ -143,7 +144,7 @@ export async function createGuestInviteTicket(
       );
     }
 
-    // Set assignee to svc-powerautomate
+    // Set assignee to service account
     try {
       const assignResponse = await fetch(
         `${JIRA_BASE_URL}/rest/api/3/issue/${issueKey}/assignee`,

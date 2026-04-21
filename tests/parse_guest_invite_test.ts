@@ -144,7 +144,7 @@ const joinedWorkspaceMessage: SlackMessage = {
     {
       id: 1,
       text:
-        "*Email*: <mailto:shyrell123@internal.yourcompany.com|shyrell123@internal.yourcompany.com>",
+        "*Email*: <mailto:shyrell123@former.example.com|shyrell123@former.example.com>",
     },
     {
       id: 2,
@@ -366,7 +366,7 @@ Deno.test("parseInviteMessage: extracts inviteRequestId from pending invite with
       {
         id: 4,
         fallback: "Approve/Deny the invite request on team site",
-        callback_id: "inviterequests_T056MAJRM63",
+        callback_id: "inviterequests_TYOURTEAMID",
         actions: [
           {
             id: "1",

@@ -5,7 +5,7 @@ import { ProcessedInvitesDatastore } from "./datastores/processed_invites.ts";
 import { JIRA_DOMAIN } from "./config.ts";
 
 export default Manifest({
-  name: "EA Slack Invite Automation",
+  name: "Slack Invite Automation",
   description:
     "Auto-approves qualifying guest invites, creates Jira audit tickets, flags others for review",
   icon: "assets/ea_slack_connect_auto.png",

@@ -6,18 +6,18 @@ import {
   SlackMessage,
 } from "../functions/parse_guest_invite.ts";
 
-// === Real Slack export data used as test fixtures ===
+// === Synthetic test fixtures — no real user data ===
 
 // Test 1: Full request with all fields (Single-Channel Guest, private, time limit, reason)
 const fullRequestMessage: SlackMessage = {
   user: "USLACKBOT",
   type: "message",
   ts: "1735831161.641489",
-  text: "<@U05B5JXG5K5> requested to invite one person to this workspace.",
+  text: "<@U0EXAMPLE01> requested to invite one person to this workspace.",
   attachments: [
     {
       id: 1,
-      text: "*Email*: <mailto:D.snellink@gmail.com|D.snellink@gmail.com>",
+      text: "*Email*: <mailto:alice@example.com|alice@example.com>",
     },
     {
       id: 2,
@@ -33,7 +33,7 @@ const fullRequestMessage: SlackMessage = {
     { id: 5, text: "*Reason for Request*:\nOnboarding" },
     {
       text:
-        ":white_check_mark: <@U05ATV3ARPB> approved this request. Invitation sent.",
+        ":white_check_mark: <@U0EXAMPLE02> approved this request. Invitation sent.",
     },
   ],
 };
@@ -43,18 +43,18 @@ const fullMemberDeniedMessage: SlackMessage = {
   user: "USLACKBOT",
   type: "message",
   ts: "1739527514.899479",
-  text: "<@U05FCG7DGGH> requested to invite one person to this workspace.",
+  text: "<@U0EXAMPLE03> requested to invite one person to this workspace.",
   attachments: [
     {
       id: 1,
-      text: "*Email*: <mailto:homalali@toloka.ai|homalali@toloka.ai>",
+      text: "*Email*: <mailto:bob@example.com|bob@example.com>",
     },
     {
       id: 2,
       text:
         "*Account type*: <https://slack.com/help/articles/360018112273|Full Member>",
     },
-    { text: ":no_entry_sign: <@U06DJER921F> denied this request." },
+    { text: ":no_entry_sign: <@U0EXAMPLE04> denied this request." },
   ],
 };
 
@@ -63,19 +63,19 @@ const publicChannelMessage: SlackMessage = {
   user: "USLACKBOT",
   type: "message",
   ts: "1739540210.356029",
-  text: "<@U05FCG7DGGH> requested to invite one person to this workspace.",
+  text: "<@U0EXAMPLE03> requested to invite one person to this workspace.",
   attachments: [
     {
       id: 1,
-      text: "*Email*: <mailto:homalali@toloka.ai|homalali@toloka.ai>",
+      text: "*Email*: <mailto:bob@example.com|bob@example.com>",
     },
     {
       id: 2,
       text:
         "*Account type*: <https://slack.com/help/articles/360018112273|Single-Channel Guest>",
     },
-    { id: 3, text: "*Channel:* <#C0571SPM8SE|random>" },
-    { text: ":no_entry_sign: <@U06DJER921F> denied this request." },
+    { id: 3, text: "*Channel:* <#C0XXXXXXXXX|random>" },
+    { text: ":no_entry_sign: <@U0EXAMPLE04> denied this request." },
   ],
 };
 
@@ -84,12 +84,12 @@ const multiChannelGuestMessage: SlackMessage = {
   user: "USLACKBOT",
   type: "message",
   ts: "1761211815.415109",
-  text: "<@U063X2PS58X> requested to invite one person to Nebius.",
+  text: "<@U0EXAMPLE05> requested to invite one person to YourOrg.",
   attachments: [
     {
       id: 1,
       text:
-        "*Email*: <mailto:Jawid.Barez@protiviti.nl|Jawid.Barez@protiviti.nl>",
+        "*Email*: <mailto:carol@example.com|carol@example.com>",
     },
     {
       id: 2,
@@ -104,7 +104,7 @@ const multiChannelGuestMessage: SlackMessage = {
     },
     {
       text:
-        ":white_check_mark: <@U083F1R4Z5J> approved this request. Invitation sent.",
+        ":white_check_mark: <@U0EXAMPLE06> approved this request. Invitation sent.",
     },
   ],
 };
@@ -114,12 +114,12 @@ const noTimeLimitNoReasonMessage: SlackMessage = {
   user: "USLACKBOT",
   type: "message",
   ts: "1736780292.515789",
-  text: "<@U06CZ6PNH3Q> requested to invite one person to this workspace.",
+  text: "<@U0EXAMPLE07> requested to invite one person to this workspace.",
   attachments: [
     {
       id: 1,
       text:
-        "*Email*: <mailto:pradeeppicassop@gmail.com|pradeeppicassop@gmail.com>",
+        "*Email*: <mailto:dave@example.com|dave@example.com>",
     },
     {
       id: 2,
@@ -129,7 +129,7 @@ const noTimeLimitNoReasonMessage: SlackMessage = {
     { id: 3, text: "*Channel:* :lock: private-channel" },
     {
       text:
-        ":white_check_mark: <@U06DJER921F> approved this request. Invitation sent.",
+        ":white_check_mark: <@U0EXAMPLE04> approved this request. Invitation sent.",
     },
   ],
 };
@@ -139,12 +139,12 @@ const joinedWorkspaceMessage: SlackMessage = {
   user: "USLACKBOT",
   type: "message",
   ts: "1765444611.300049",
-  text: "<@U05DVKKM3KJ> requested to invite one person to Nebius.",
+  text: "<@U0EXAMPLE08> requested to invite one person to YourOrg.",
   attachments: [
     {
       id: 1,
       text:
-        "*Email*: <mailto:shyrell123@former.example.com|shyrell123@former.example.com>",
+        "*Email*: <mailto:frank@example.com|frank@example.com>",
     },
     {
       id: 2,
@@ -152,7 +152,7 @@ const joinedWorkspaceMessage: SlackMessage = {
         "*Account type*: <https://slack.com/help/articles/360018112273|Full Member>",
     },
     { id: 3, text: "*Channel:* :lock: private-channel" },
-    { text: "<@U0A34QW6KUZ> joined the workspace." },
+    { text: "<@U0EXAMPLE09> joined the workspace." },
   ],
 };
 
@@ -161,12 +161,12 @@ const reasonNoTimeLimitMessage: SlackMessage = {
   user: "USLACKBOT",
   type: "message",
   ts: "1736339602.734899",
-  text: "<@U05B860QXL4> requested to invite one person to this workspace.",
+  text: "<@U0EXAMPLE10> requested to invite one person to this workspace.",
   attachments: [
     {
       id: 1,
       text:
-        "*Email*: <mailto:bpatel@realmgroup.io|bpatel@realmgroup.io>",
+        "*Email*: <mailto:eve@example.com|eve@example.com>",
     },
     {
       id: 2,
@@ -181,7 +181,7 @@ const reasonNoTimeLimitMessage: SlackMessage = {
     },
     {
       text:
-        ":white_check_mark: <@U06DJER921F> approved this request. Invitation sent.",
+        ":white_check_mark: <@U0EXAMPLE04> approved this request. Invitation sent.",
     },
   ],
 };
@@ -191,8 +191,8 @@ const reasonNoTimeLimitMessage: SlackMessage = {
 Deno.test("parses full invite with all fields", () => {
   const result = parseInviteMessage(fullRequestMessage);
   assertEquals(result !== null, true);
-  assertEquals(result!.requesterUserId, "U05B5JXG5K5");
-  assertEquals(result!.email, "D.snellink@gmail.com");
+  assertEquals(result!.requesterUserId, "U0EXAMPLE01");
+  assertEquals(result!.email, "alice@example.com");
   assertEquals(result!.accountType, "Single-Channel Guest");
   assertEquals(result!.channelName, "private-channel");
   assertEquals(result!.channelPrivate, true);
@@ -204,8 +204,8 @@ Deno.test("parses full invite with all fields", () => {
 Deno.test("parses Full Member invite (no channel, no time limit, no reason)", () => {
   const result = parseInviteMessage(fullMemberDeniedMessage);
   assertEquals(result !== null, true);
-  assertEquals(result!.requesterUserId, "U05FCG7DGGH");
-  assertEquals(result!.email, "homalali@toloka.ai");
+  assertEquals(result!.requesterUserId, "U0EXAMPLE03");
+  assertEquals(result!.email, "bob@example.com");
   assertEquals(result!.accountType, "Full Member");
   assertEquals(result!.channelName, "unknown"); // no channel attachment
   assertEquals(result!.channelPrivate, false);
@@ -223,8 +223,8 @@ Deno.test("parses public channel with Slack link format", () => {
 Deno.test("parses Multi-Channel Guest with multiple private channels", () => {
   const result = parseInviteMessage(multiChannelGuestMessage);
   assertEquals(result !== null, true);
-  assertEquals(result!.requesterUserId, "U063X2PS58X");
-  assertEquals(result!.email, "Jawid.Barez@protiviti.nl");
+  assertEquals(result!.requesterUserId, "U0EXAMPLE05");
+  assertEquals(result!.email, "carol@example.com");
   assertEquals(result!.accountType, "Multi-Channel Guest");
   assertEquals(result!.channelName, "2 private-channels");
   assertEquals(result!.channelPrivate, true);
@@ -234,7 +234,7 @@ Deno.test("parses Multi-Channel Guest with multiple private channels", () => {
 Deno.test("parses invite with no time limit and no reason", () => {
   const result = parseInviteMessage(noTimeLimitNoReasonMessage);
   assertEquals(result !== null, true);
-  assertEquals(result!.email, "pradeeppicassop@gmail.com");
+  assertEquals(result!.email, "dave@example.com");
   assertEquals(result!.accountType, "Single-Channel Guest");
   assertEquals(result!.channelPrivate, true);
   assertEquals(result!.timeLimit, null);
@@ -244,7 +244,7 @@ Deno.test("parses invite with no time limit and no reason", () => {
 Deno.test("parses invite with reason but no time limit", () => {
   const result = parseInviteMessage(reasonNoTimeLimitMessage);
   assertEquals(result !== null, true);
-  assertEquals(result!.email, "bpatel@realmgroup.io");
+  assertEquals(result!.email, "eve@example.com");
   assertEquals(result!.reason, "External hiring agency for hiring purposes");
   assertEquals(result!.timeLimit, null);
 });
@@ -257,9 +257,9 @@ Deno.test("parses Full Member with private channel", () => {
   assertEquals(result!.channelPrivate, true);
 });
 
-Deno.test("handles 'to this workspace' and 'to Nebius' variants", () => {
+Deno.test("handles 'to this workspace' and 'to YourOrg' variants", () => {
   const result1 = parseInviteMessage(fullRequestMessage); // "to this workspace"
-  const result2 = parseInviteMessage(multiChannelGuestMessage); // "to Nebius"
+  const result2 = parseInviteMessage(multiChannelGuestMessage); // "to YourOrg"
   assertEquals(result1 !== null, true);
   assertEquals(result2 !== null, true);
 });
@@ -287,21 +287,21 @@ Deno.test("parses approval from attachments", () => {
   const result = parseDecisionFromMessage(fullRequestMessage);
   assertEquals(result !== null, true);
   assertEquals(result!.action, "APPROVED");
-  assertEquals(result!.actorUserId, "U05ATV3ARPB");
+  assertEquals(result!.actorUserId, "U0EXAMPLE02");
 });
 
 Deno.test("parses denial from attachments", () => {
   const result = parseDecisionFromMessage(fullMemberDeniedMessage);
   assertEquals(result !== null, true);
   assertEquals(result!.action, "DENIED");
-  assertEquals(result!.actorUserId, "U06DJER921F");
+  assertEquals(result!.actorUserId, "U0EXAMPLE04");
 });
 
 Deno.test("parses joined workspace from attachments", () => {
   const result = parseDecisionFromMessage(joinedWorkspaceMessage);
   assertEquals(result !== null, true);
   assertEquals(result!.action, "JOINED");
-  assertEquals(result!.actorUserId, "U0A34QW6KUZ");
+  assertEquals(result!.actorUserId, "U0EXAMPLE09");
 });
 
 Deno.test("returns null for message with no decision", () => {
@@ -322,27 +322,27 @@ Deno.test("returns null for message with no decision", () => {
 
 Deno.test("parseDecisionText: approval", () => {
   const result = parseDecisionText(
-    ":white_check_mark: <@U06DJER921F> approved this request. Invitation sent.",
+    ":white_check_mark: <@U0EXAMPLE04> approved this request. Invitation sent.",
   );
   assertEquals(result !== null, true);
   assertEquals(result!.action, "APPROVED");
-  assertEquals(result!.actorUserId, "U06DJER921F");
+  assertEquals(result!.actorUserId, "U0EXAMPLE04");
 });
 
 Deno.test("parseDecisionText: denial", () => {
   const result = parseDecisionText(
-    ":no_entry_sign: <@U06DJER921F> denied this request.",
+    ":no_entry_sign: <@U0EXAMPLE04> denied this request.",
   );
   assertEquals(result !== null, true);
   assertEquals(result!.action, "DENIED");
-  assertEquals(result!.actorUserId, "U06DJER921F");
+  assertEquals(result!.actorUserId, "U0EXAMPLE04");
 });
 
 Deno.test("parseDecisionText: joined", () => {
-  const result = parseDecisionText("<@U0A34QW6KUZ> joined the workspace.");
+  const result = parseDecisionText("<@U0EXAMPLE09> joined the workspace.");
   assertEquals(result !== null, true);
   assertEquals(result!.action, "JOINED");
-  assertEquals(result!.actorUserId, "U0A34QW6KUZ");
+  assertEquals(result!.actorUserId, "U0EXAMPLE09");
 });
 
 Deno.test("parseDecisionText: non-decision text", () => {
@@ -354,7 +354,7 @@ Deno.test("parseDecisionText: non-decision text", () => {
 
 Deno.test("parseInviteMessage: extracts inviteRequestId from pending invite with actions", () => {
   const message: SlackMessage = {
-    text: "<@U0A9LLN7CN9> requested to invite one person to Nebius.",
+    text: "<@U0EXAMPLE12> requested to invite one person to YourOrg.",
     attachments: [
       { id: 1, text: "*Email*: <mailto:test@example.com|test@example.com>" },
       {
@@ -398,7 +398,7 @@ Deno.test("parseInviteMessage: extracts inviteRequestId from pending invite with
 
 Deno.test("parseInviteMessage: inviteRequestId is null for already-decided invite", () => {
   const message: SlackMessage = {
-    text: "<@U05RFQEE5LY> requested to invite one person to Nebius.",
+    text: "<@U0EXAMPLE11> requested to invite one person to YourOrg.",
     attachments: [
       {
         id: 1,
@@ -418,7 +418,7 @@ Deno.test("parseInviteMessage: inviteRequestId is null for already-decided invit
       { id: 5, text: "*Reason for Request*:\nCSA Hiring" },
       {
         text:
-          ":white_check_mark: <@U083F1R4Z5J> approved this request. Invitation sent.",
+          ":white_check_mark: <@U0EXAMPLE06> approved this request. Invitation sent.",
       },
     ],
   };
@@ -431,7 +431,7 @@ Deno.test("parseInviteMessage: inviteRequestId is null for already-decided invit
 
 Deno.test("parseInviteMessage: inviteRequestId is null when no actions attachment", () => {
   const message: SlackMessage = {
-    text: "<@U05B5NLQM6W> requested to invite one person to Nebius.",
+    text: "<@U0EXAMPLE13> requested to invite one person to YourOrg.",
     attachments: [
       {
         id: 1,
